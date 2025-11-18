@@ -1,0 +1,230 @@
+---
+title: "Project 2: Air Pollution and Sickle Cell Disease"
+author: "Your Name"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output:
+  word_document:
+    toc: false
+    df_print: default
+---
+
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+echo = FALSE, # hide code in final Word document
+message = FALSE,
+warning = FALSE
+)
+
+library(readr)
+library(dplyr)
+library(lubridate)
+library(tidyr)
+library(ggplot2)
+
+setwd("C:\\Users\\Administrator\\Desktop\\Work\\data-6(1)\\data")
+```
+
+##Github Link:
+
+## Background
+
+The current report allows examining trends in RDU airport monitor ambient air pollutant levels during 2018-2020. The analysis focuses on carbon monoxide (CO), fine particulate matter (PM2.5), and ozone (O3), which are three pollutants that can affect the vaso-occlusion and pain crisis in patients with sickle cell disease. The raw EPA data are cleaned by standardising variable names, averaging multiple measurements per day, removing duplicated rows, and setting any negative concentration values to zero before creating summary plots; a reusable function is used, where the negative concentrations are set to zero.
+
+## Data Processing Function
+
+The data on the air quality are given in the form of three CSV files (AQ_2018.csv, AQ-2019.csv, AQ-2020.csv) with all the measurements in a daily scale for CO, PM 2.5, and O3. The second step serves to process a single file at a time and produce a clean dataset, one row per day, and standardized pollutant variables.
+
+```{r}
+process_aq <- function(file_path) {
+
+# Read raw CSV from the provided path
+
+raw <- readr::read_csv(file_path, show_col_types = FALSE)
+
+# Clean and standardize:
+
+# 1. Remove exact duplicate rows
+
+# 2. Rename pollutant concentration columns to short, informative names
+
+# 3. Convert date string to Date type
+
+# 4. Set negative concentrations to zero (measurement error handling)
+
+# 5. For days with multiple measurements, compute daily averages
+
+clean <- raw %>%
+dplyr::distinct() %>%
+dplyr::rename(
+co   = `Daily Max 8-hour CO Concentration`,
+pm25 = `Daily Mean PM2.5 Concentration`,
+o3   = `Daily Max 8-hour Ozone Concentration`
+) %>%
+dplyr::mutate(
+date = lubridate::mdy(Date)
+) %>%
+# Keep only variables needed for analysis
+dplyr::select(date, co, pm25, o3) %>%
+# Set negative concentrations to zero
+dplyr::mutate(
+dplyr::across(
+.cols = c(co, pm25, o3),
+.fns = ~ dplyr::if_else(.x < 0, 0, .x)
+)
+) %>%
+# Average multiple measurements per date
+dplyr::group_by(date) %>%
+dplyr::summarise(
+dplyr::across(
+.cols = c(co, pm25, o3),
+.fns = ~ mean(.x, na.rm = TRUE)
+),
+.groups = "drop"
+)
+
+return(clean)
+}
+
+```
+
+## Applying the Function to the Three Years of Data
+
+The three annual files are now subjected to the processing function. Cleaned datasets are subsequently pooled into one dataset, and year and month variables are added, which will be applied in using subsequent summaries and plots.
+
+
+```{r}
+
+aq_2018 <- process_aq("AQ_2018.csv")
+aq_2019 <- process_aq("AQ_2019.csv")
+aq_2020 <- process_aq("AQ_2020.csv")
+
+# Combine and add year/month variables
+
+aq_all <- bind_rows(aq_2018, aq_2019, aq_2020) %>%
+mutate(
+year  = lubridate::year(date),
+month = lubridate::month(date)
+)
+
+# Long format for flexible summaries
+
+aq_long <- aq_all %>%
+tidyr::pivot_longer(
+cols      = c(co, pm25, o3),
+names_to  = "pollutant",
+values_to = "value"
+)
+
+```
+
+
+
+### Plot 1: Monthly CO and O3 (Averaged over 2018–2020)
+
+The first plot shows the average concentration of CO and O3 in the month, averaged over the three years. The average and the 9The mean and 95% confidence interval are calculated for each pollutant and month on daily basis with the daily values used as the underlying values.
+
+
+```{r}
+co_o3_summary <- aq_long %>%
+filter(pollutant %in% c("co", "o3")) %>%
+group_by(month, pollutant) %>%
+summarise(
+n    = sum(!is.na(value)),
+mean = mean(value, na.rm = TRUE),
+sd   = sd(value, na.rm = TRUE),
+se   = sd / sqrt(n),
+# t critical value for 95% CI; protect against n = 1
+t_crit   = qt(0.975, df = pmax(n - 1, 1)),
+ci_lower = mean - t_crit * se,
+ci_upper = mean + t_crit * se,
+.groups  = "drop"
+)
+
+```
+
+
+```{r}
+co_o3_plot <- ggplot(co_o3_summary, aes(x = month, y = mean, color = pollutant)) +
+geom_line() +
+geom_point(size = 2) +
+geom_errorbar(aes(ymin = ci_lower, ymax = ci_upper), width = 0.15) +
+scale_x_continuous(
+breaks = 1:12,
+labels = month.abb
+) +
+labs(
+title = "Monthly Mean CO and O3 Concentrations (2018–2020)",
+x     = "Month",
+y     = "Mean daily concentration",
+color = "Pollutant"
+) +
+theme_minimal(base_size = 12) +
+theme(
+legend.position = "bottom"
+)
+
+co_o3_plot
+
+```
+
+
+The resulting plot makes it possible to compare the seasonal patterns of CO and O3, with 95% confidence intervals quantifying uncertainty around the monthly means.
+
+### Plot 2: Monthly PM2.5 by Year
+
+The second plot summarizes PM2.5 concentrations by month and year. For each combination of year and month, the mean of the daily PM2.5 values is computed. The 2020 dataset only includes data through April, so later months appear only for 2018 and 2019.
+
+```{r}
+pm25_summary <- aq_all %>%
+group_by(year, month) %>%
+summarise(
+mean_pm25 = mean(pm25, na.rm = TRUE),
+.groups   = "drop"
+)
+
+```
+
+
+```{r}
+pm25_plot <- ggplot(pm25_summary, aes(x = month, y = mean_pm25,
+color = factor(year),
+group = year)) +
+geom_line() +
+geom_point(size = 2) +
+scale_x_continuous(
+breaks = 1:12,
+labels = month.abb
+) +
+labs(
+title = "Monthly Mean PM2.5 Concentrations by Year",
+x     = "Month",
+y     = "Mean daily PM2.5 (µg/m³)",
+color = "Year"
+) +
+theme_minimal(base_size = 12) +
+theme(
+legend.position = "bottom"
+)
+
+pm25_plot
+
+```
+
+
+
+This visualization highlights year-to-year differences in PM2.5 seasonal patterns and makes the truncated nature of the 2020 data (through April) immediately visible.
+
+## Interpretation
+
+
+The processed data indicate that there is indeed a seasonal difference in the level of air pollutants at the RDU monitor which may also be applicable in the results of sickle cell diseases. There are peaks of CO concentrations during colder months and means and confidence intervals are higher during winter and early spring and decrease towards a mid-year minimum and increase again in the late summer and into December. This is also coherent with greater heating combustion and reduced dispersion in the atmosphere in winter, so that people with SCD might have greater exposure to CO in months when vaso-occlusive crises may already be provoked by cold stress. Conversely, O 3 is of smaller magnitude with a slight positive growth in late spring and summer, which is consistent with the photochemical formation of ozone in warmer sunny conditions. PM 2. 5 shows variability done on year-to-year bases where in the year 2018, the highest peaks were in winter and late years with stronger peaks in 2019 at the beginning of the year and increasing trend during the months of January to April 2020 as there were no other months in that year. These findings combined show that not all exposures to the contributions of combustion-related and photochemical poll utters remain over time, which is why it is important to consider the season and year when attributing ambient pollution activities to health-care utilisation in patients with sickle cell disease.
+
+
+
+
+
+
+
