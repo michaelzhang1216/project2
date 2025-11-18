@@ -1,6 +1,6 @@
 ---
 title: "Project 2: Air Pollution and Sickle Cell Disease"
-author: "Your Name"
+author: "Michael Zhang"
 date: "`r format(Sys.Date(), '%B %d, %Y')`"
 output:
   word_document:
@@ -221,6 +221,7 @@ This visualization highlights year-to-year differences in PM2.5 seasonal pattern
 
 
 The processed data indicate that there is indeed a seasonal difference in the level of air pollutants at the RDU monitor which may also be applicable in the results of sickle cell diseases. There are peaks of CO concentrations during colder months and means and confidence intervals are higher during winter and early spring and decrease towards a mid-year minimum and increase again in the late summer and into December. This is also coherent with greater heating combustion and reduced dispersion in the atmosphere in winter, so that people with SCD might have greater exposure to CO in months when vaso-occlusive crises may already be provoked by cold stress. Conversely, O 3 is of smaller magnitude with a slight positive growth in late spring and summer, which is consistent with the photochemical formation of ozone in warmer sunny conditions. PM 2. 5 shows variability done on year-to-year bases where in the year 2018, the highest peaks were in winter and late years with stronger peaks in 2019 at the beginning of the year and increasing trend during the months of January to April 2020 as there were no other months in that year. These findings combined show that not all exposures to the contributions of combustion-related and photochemical poll utters remain over time, which is why it is important to consider the season and year when attributing ambient pollution activities to health-care utilisation in patients with sickle cell disease.
+
 
 
 
